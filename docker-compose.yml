@@ -1,0 +1,65 @@
+version: "3.9"
+services:
+  redis:
+    image: redis
+    restart: always
+    ports:
+      - 6379
+    networks:
+      - back-tier
+      - poll-tier
+
+  db:
+    image: "postgres:13"
+    restart: always
+    networks:
+      - result-tier
+      - back-tier
+    volumes:
+      - db-data:/var/lib/pgsql
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    env_file:
+      - ./.env
+
+  poll:
+    build: ./poll/
+    restart: always
+    ports:
+      - "5000:80"
+    networks:
+      - poll-tier
+    depends_on:
+      - redis
+    env_file:
+      - ./.env
+
+  result:
+    build: ./result/
+    restart: always
+    ports:
+      - "5001:80"
+    networks:
+      - result-tier
+    depends_on:
+      - db
+    env_file:
+      - ./.env
+
+  worker:
+    build: ./worker/
+    restart: always
+    networks:
+      - back-tier
+    depends_on:
+      - redis
+      - db
+    env_file:
+      - ./.env
+
+networks:
+  poll-tier:
+  result-tier:
+  back-tier:
+
+volumes:
+  db-data: {}
